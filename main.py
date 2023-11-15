@@ -4,20 +4,20 @@ import random
 import math
 
 pygame.init()
+pygame.font.init()
+font = pygame.font.SysFont(None, 20)
 
 # Variabele
 width, height = 1200, 800       # Breedte en hoogte van scherm
 fps = 60                        # Frames per second
 radius = 1                      # Radius van de bolletjes
-S, I, Z, R = 100, 0, 1, 0         # Aantal mensen, I is nu nutteloos
+S, I, Z, R = 1000, 0, 1, 0       # Aantal mensen, I is nu nutteloos
 bg_colour = (0, 0, 0)           # Background colour
-direction_update = 5        # Elke 5 frames wordt de direction geupdate anders ziet het er vreemd uit (zet maar op 1)
+direction_update = 5            # Elke 5 frames wordt de direction geupdate anders ziet het er vreemd uit (zet maar op 1)
 infection_distance = 20         # Zombies kunnen susceptibles op 10 pixel afstand infecteren
 
 box_offset = 20
-box_thickness = 4
-
-counter = 0
+box_thickness = 1
 
 
 class Human:
@@ -77,11 +77,21 @@ class Susceptible(Human):
 class Infected(Human):
     def __init__(self, x, y):
         super().__init__(x, y, 0, 0, (255, 255, 0))
+        self.infection_counter = 0
 
+    def update(self):
+        super().move()
+        self.infection_counter += 1
+
+        if self.infection_counter >= 600:  # Check if the infection time has passed
+            return Zombie(self.x, self.y)  # Convert the infected to a zombie
+
+        return None
 
 class Zombie(Human):
     def __init__(self, x, y):
         super().__init__(x, y, 0, 0, (0, 255, 0))
+        # self.radius = 5
 
     def infect(self, susceptible):
         distance = math.sqrt((self.x - susceptible.x)**2 + (self.y - susceptible.y)**2)
@@ -110,6 +120,7 @@ dragging = False
 initial_pos = (0, 0)
 zoom_factor = 1.0
 
+frame_count = 0
 paused = False
 running = True
 
@@ -149,9 +160,8 @@ while running:
             if dragging:
                 human.x += dx
                 human.y += dy
-
+        # -------------------------------------------
         new_infected = []
-
         for zombie in zombies:
             for susceptible in susceptibles:
                 infected_individual = zombie.infect(susceptible)        # Itereren over alle zombies en susceptibles voor geinfecteerde
@@ -160,12 +170,27 @@ while running:
                     susceptibles.remove(susceptible)                    # En verwijderen van susceptibles
 
         infected.extend(new_infected)                                   # Nieuwe geinfecteerde toevoegen aan geinfecteerde
+        # -------------------------------------------
+        new_zombies = []
+        for infected_person in infected:
+            result = infected_person.update()
+            if result:
+                new_zombies.append(result)
+        zombies.extend(new_zombies)
+        infected = [infected_person for infected_person in infected if infected_person.infection_counter < 600]
+        # -------------------------------------------
 
     screen.fill(bg_colour)
     for human in susceptibles + infected + zombies + resistants:    # Alle mensen tekenen
         human.draw(screen, camera_x, camera_y, zoom_factor)
 
+    frame_text = font.render(f"Frame: {frame_count}", True, (0, 255, 0))
+    screen.blit(frame_text, (10, 10))
+    fps_text = font.render(f"FPS: {round(clock.get_fps(),2)}", True, (0, 255, 0))
+    screen.blit(fps_text, (10, 40))
+
     pygame.display.flip()
+    frame_count += 1
     clock.tick(fps)
 
 pygame.quit()
